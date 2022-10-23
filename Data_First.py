@@ -20,6 +20,27 @@ def conn_db():
         print("Couldn't connect to db")
 
     return conn
+
+def send_query_counts(year, action):
+    conn = conn_db()
+    cur = conn.cursor()
+    current_month = datetime.fromisoformat(f'{year}-01-01 00:00:00')
+    count_per_month_arr = []
+
+    for i in range(12):
+        next_month = current_month + relativedelta(months=+1)
+        cur.execute(''.join(['SELECT count(*) '
+                            ,' from events_junction '
+                            ,f' where action = "{action}" '
+                            ,f' AND timestamp BETWEEN "{current_month}" and "{next_month}"; ']))
+        count_monthly = cur.fetchall()
+        print(count_monthly)
+        count_per_month_arr.append(count_monthly)
+        current_month = current_month + relativedelta(months=+1)
+
+    conn.close()
+    return count_per_month_arr
+
 def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__)
@@ -63,15 +84,11 @@ def create_app(test_config=None):
         conn = conn_db()
         cur = conn.cursor()
         year = request.args.get('year')
-        print(year)
         current_month = datetime.fromisoformat(f'{year}-01-01 00:00:00')
-        print(f"currenjt: {current_month}")
         data_per_year = []
         
-        for i in range(11):
+        for i in range(12):
             next_month = current_month + relativedelta(months=+1)
-            print(f"currenjt: {current_month}")
-            print(f"next: {next_month}")
             query = ''.join(['SELECT DISTINCT "properties.product_id" as product, "properties.total" as price, COUNT(*) as quantity , "properties.total" * COUNT(*)  AS profit '
                     ,' FROM events_junction '
                     ,' where action = "checkout_item" '
@@ -96,20 +113,58 @@ def create_app(test_config=None):
             'data': data_per_year
         })
 
-    @app.route("/top_product_try", methods=["GET"])
+    @app.route("/get_monthly_optout", methods=["GET"])
     #TODO: make for every month of a year. Receive year from frontend/clientapi. Does it make sense to receive year from client?
-    def top_product_try():
-        conn = conn_db()
-        cur = conn.cursor()
-        cur.execute('SELECT * from activities_junction;')
-        data_monthly = cur.fetchall()
+    def get_monthly_optout():
+        year = request.args.get('year')
+        optout_count_monthly_arr = send_query_counts(year, action="opt_out")
 
-        conn.close()
-        print(data_monthly[0])
         return jsonify({
             'success': True,
-            'data_monthly': data_monthly[0]
+            'data': optout_count_monthly_arr
         })
+    
+    @app.route("/get_monthly_optin", methods=["GET"])
+    #TODO: make for every month of a year. Receive year from frontend/clientapi. Does it make sense to receive year from client?
+    def get_monthly_optin():
+        year = request.args.get('year')
+        optin_count_monthly_arr = send_query_counts(year, action="opt_in")
+
+        return jsonify({
+            'success': True,
+            'data': optin_count_monthly_arr
+        })
+
+    @app.route("/get_monthly_points_expired", methods=["GET"])
+    #TODO: make for every month of a year. Receive year from frontend/clientapi. Does it make sense to receive year from client?
+    def get_monthly_points_expired():
+        year = request.args.get('year')
+        points_expired_count_monthly_arr = send_query_counts(year, action="points_expired")
+        return jsonify({
+            'success': True,
+            'data': points_expired_count_monthly_arr
+        })
+
+    @app.route("/get_monthly_referral", methods=["GET"])
+    #TODO: make for every month of a year. Receive year from frontend/clientapi. Does it make sense to receive year from client?
+    def get_monthly_referral():
+        year = request.args.get('year')
+        referrals_count_monthly_arr = send_query_counts(year, action="referral")
+        return jsonify({
+            'success': True,
+            'data': referrals_count_monthly_arr
+        })
+    
+    @app.route("/get_points_spend", methods=["GET"])
+    #TODO: make for every month of a year. Receive year from frontend/clientapi. Does it make sense to receive year from client?
+    def get_points_spend():
+        year = request.args.get('year')
+        point_spend_count_monthly_arr = send_query_counts(year, action="point_spend")
+        return jsonify({
+            'success': True,
+            'data': point_spend_count_monthly_arr
+        })
+
     @app.errorhandler(400)
     def bad_request(error):
         return jsonify({
